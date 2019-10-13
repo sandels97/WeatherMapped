@@ -19,8 +19,7 @@ export default function App() {
       showIcon: true,
       activeTintColor: '#ffffff',
       inactiveTintColor: '#cccccc',
-      style: { 
-        marginTop: StatusBar.currentHeight,
+      style: {
         backgroundColor: '#ff0000',
       }
     },

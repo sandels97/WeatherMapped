@@ -1,5 +1,5 @@
-import React, {useState, useEffect} from 'react';
-import { StyleSheet, Button, Text, TextInput, View, Image, KeyboardAvoidingView} from 'react-native';
+import React, {useState, useEffect, useRef} from 'react';
+import { StyleSheet, Button, Text, Alert, TextInput, View, StatusBar, Image, KeyboardAvoidingView} from 'react-native';
 
 import * as Location from 'expo-location';
 import * as Permissions from 'expo-permissions';
@@ -7,6 +7,9 @@ import MapView, {Marker, AnimatedRegion} from 'react-native-maps';
 
 export default function MapScreen() {
   
+  const weatherApiKey = '';
+  const mapQuestApiKey = '';
+
   const [searchText, setSearchText] = useState('');
   const [lat, setLatitude] = useState(0);
   const [long, setLongitude] = useState(0);
@@ -27,92 +30,111 @@ export default function MapScreen() {
     } else {
       let location = await Location.getCurrentPositionAsync();
 
-      let lat = location.coords.latitude;
-      let long = location.coords.longitude;
-      setLatitude(lat);
-      setLongitude(long);
-      getLocationDataByCoordinates(lat, long);
+      let event = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      };
+
+      updateLocation(event);
     }
   };
 
   const searchWeatherByLocation = async (name) => {
     try {
-      var apiKey = '';
-
-      //Get weather data based on the coordinates
-      const response = await fetch('http://api.openweathermap.org/data/2.5/weather?q=' + name + '&units=metric&APPID=' + apiKey);
+      const response = await fetch('http://api.openweathermap.org/data/2.5/weather?q=' + name + '&units=metric&APPID=' + weatherApiKey);
 
       const data = await response.json();
 
       updateWeather(data);
     } catch (error) {
-        Alert.alert("Error", error);
+      console.log(error);
     }
   };
 
-  const getLocationDataByCoordinates = (latidute, longitude) => {
-    var apiKey = '';
-    const url = 'http://www.mapquestapi.com/geocoding/v1/reverse?key=' + apiKey + '&location=' + latidute + ',' + longitude;
-    
-    fetch(url)
-    .then((response) => response.json())
-    .then((responseJson) => {
+  const getLocationDataByCoordinates = async (latidute, longitude) => {
+    const url = 'http://www.mapquestapi.com/geocoding/v1/reverse?key=' + mapQuestApiKey + '&location=' + latidute + ',' + longitude;
+    const response = await fetch(url);
 
-      let lat = responseJson.results[0].locations[0].latLng.lat;
-      let long = responseJson.results[0].locations[0].latLng.lng;
-      setLatitude(lat);
-      setLongitude(long);
+    const data = await response.json();
 
-      searchWeatherByLocation(responseJson.results[0].locations[0].adminArea5);
-    })
-    .catch((error) => {
-      Alert.alert("Error", error);
-    });
+    let lat = data.results[0].locations[0].latLng.lat;
+    let long = data.results[0].locations[0].latLng.lng;
+    setLatitude(lat);
+    setLongitude(long);
+
+    searchWeatherByLocation(data.results[0].locations[0].adminArea5);
   }
-  const getLocationDataByName = () => {
-    var apiKey = '';
-    const url = 'http://www.mapquestapi.com/geocoding/v1/reverse?key=' + apiKey + '&location=' + searchText;
-    fetch(url)
-    .then((response) => response.json())
-    .then((responseJson) => {
+  const getLocationDataByName = async () => {
+    const url = 'http://www.mapquestapi.com/geocoding/v1/address?key=' + mapQuestApiKey + '&location=' + searchText;
+    const response = await fetch(url);
 
-      let lat = responseJson.results[0].locations[0].latLng.lat;
-      let long = responseJson.results[0].locations[0].latLng.lng;
-      setLatitude(lat);
-      setLongitude(long);
+    const data = await response.json();
 
-      searchWeatherByLocation(searchText);
-    })
-    .catch((error) => {
-      Alert.alert("Error", error);
-    });
+    let lat = data.results[0].locations[0].latLng.lat;
+    let long = data.results[0].locations[0].latLng.lng;
+    setLatitude(lat);
+    setLongitude(long);
+
+    let event = {
+      latitude: lat,
+      longitude: long
+    };
+
+    animateMapTransition(event);
+    searchWeatherByLocation(data.results[0].locations[0].adminArea5);
   };
 
   const updateWeather = (data) => {
-    setTempature(data.main.temp);
-    setWeather(data.weather[0].main);
-    setLocationName(data.name);
-    var iconUrl = "http://openweathermap.org/img/w/" + data.weather[0].icon + ".png";
-    setWeatherImage(iconUrl);
+    if(data.cod === 200) {
+      //Weather data found
+      setTempature(data.main.temp);
+      setWeather(data.weather[0].main);
+      setLocationName(data.name);
+      var iconUrl = "http://openweathermap.org/img/w/" + data.weather[0].icon + ".png";
+      setWeatherImage(iconUrl);
+    } else {
+      //Error fetching weather data
+      setTempature(0);
+      setWeather('');
+      setLocationName('');
+      setWeatherImage('');
+    }
   };
 
   const updateLocation = (event) => {
     setLatitude(event.latitude);
     setLongitude(event.longitude);
-
+    
+    animateMapTransition(event);
     getLocationDataByCoordinates(event.latitude, event.longitude);
   };
 
+  const animateMapTransition = (event) => {
+    let region = {
+      latitude: parseFloat(event.latitude),
+      longitude: parseFloat(event.longitude),
+      latitudeDelta: 5,
+      longitudeDelta: 5
+    };
+    this.mapView.animateToRegion(region, 1000);
+  }
   return (
-    <KeyboardAvoidingView style={styles.container} behavior='padding' enabled>
-      <MapView style={styles.MapStyle} onPress={
-          (event) => updateLocation(event.nativeEvent.coordinate)}>
-        <Marker coordinate={{latitude: lat, longitude: long}}>
-            <View style={{alignItems: "center", justifyContent: "center"}}>
-              <Image source={{uri: weatherImage}} style={{height: 35, width:35 }} />
-            </View>
-          </Marker>
-      </MapView>
+    <View style={styles.container}>
+
+      <View style={styles.TitleContainer}>
+        <Text style={{textAlign: 'center', fontSize: 30, fontWeight: 'bold', margin: 5}}>Weather Mapped</Text>
+        <Text style={{textAlign: 'center'}}>Start by searching for a city or tapping a location on a map</Text>
+      </View>
+      <View style={styles.SearchContainer}>
+        <TextInput 
+              style={styles.Input} 
+              placeholder='Search city'
+              value={searchText}
+              onChangeText={(text) => setSearchText(text)}>
+        </TextInput>
+        <Button title="Find" onPress={getLocationDataByName}></Button>
+      </View>
+
       { locationName !== '' ? (
         <View style={styles.WeatherContainer}>
           <Text style={styles.TextHeader}>{locationName}</Text>
@@ -121,19 +143,20 @@ export default function MapScreen() {
             <Text style={styles.TextStyle}>{weather}</Text>
           </View>
         </View>
-        ) :(
+        ) : (
           <View></View>
         )}
-      <View style={styles.SearchContainer}>
-        <TextInput 
-              placeholder='Search location'
-              style={styles.Input} 
-              value={searchText}
-              onChangeText={(text) => setSearchText(text)}>
-        </TextInput>
-        <Button style={{flex: 1}} title="Find" onPress={getLocationDataByName}></Button>
-      </View>
-    </KeyboardAvoidingView>
+
+      <MapView style={{flex: 8}} onPress={
+          (event) => updateLocation(event.nativeEvent.coordinate)} ref={ref => (this.mapView = ref)}>
+
+        <Marker coordinate={{latitude: lat, longitude: long}}>
+            <View style={{alignItems: "center", justifyContent: "center"}}>
+              <Image source={{uri: weatherImage}} style={{height: 35, width:35 }} />
+            </View>
+          </Marker>
+      </MapView>
+    </View>
   );
 }
 
@@ -143,8 +166,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'stretch',
     justifyContent: 'flex-start',
-  }, MapStyle: {
-    flex: 8
+    paddingBottom: 0
+  }, TitleContainer: {
+    flex: 1,
+    marginTop: StatusBar.currentHeight + 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 30,
+    marginRight: 30
   }, WeatherContainer: {
     flex: 1,
     flexDirection: 'row',
@@ -155,7 +184,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     margin: 5
   }, TextHeader: {
     fontSize: 30,
@@ -168,8 +197,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center'
   }, Input: {
-    flex: 4,
-    height: 30,
+    width: '80%',
+    height: '50%',
     margin: 5,
     borderColor: '#555555', 
     borderWidth: 1
