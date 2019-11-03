@@ -1,8 +1,9 @@
 import React, {useState, useEffect} from 'react';
-import { StyleSheet, Text, View, FlatList, Button } from 'react-native';
+import { StyleSheet, Text, View, FlatList, Button, ToastAndroid, StatusBar } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import Database from './DatabaseManager.js';
 import { NavigationEvents } from 'react-navigation';
+import { ListItem } from 'react-native-elements';
 
 export default function FavoritesScreen(props) {
 
@@ -14,10 +15,11 @@ export default function FavoritesScreen(props) {
       updateList();
   },[]);
 
-  const deleteItem = (id) => {
+  const deleteItem = (name,id) => {
     db.transaction( tx => {
       tx.executeSql('delete from favorites where id = ?;',[id]);
     }, null, updateList);
+    ToastAndroid.show(name + " removed from favorites", ToastAndroid.LONG);
   }
 
   const updateList = () => {
@@ -31,18 +33,21 @@ export default function FavoritesScreen(props) {
 
   return (
     <View style={styles.container}>
-      <Text>FavoritesScreen</Text>
+      <View style={styles.TitleContainer}>
+        <Text style={styles.HeaderText}>Favorites</Text>
+        <Text style={{textAlign: 'center'}}>Tap location to navigate to it in the map or press and hold to unfavorite it</Text>
+      </View>
+      
       <NavigationEvents onDidFocus={() => updateList()}/>
       <View style={styles.list}>
-        <FlatList data={data} renderItem={({item}) => 
-          <View>
-            <Text>{item.location}</Text>
-            <Text>{item.latitude}</Text>
-            <Text>{item.longitude}</Text>
-            <Button title='Navigate' onPress={() => {
-                props.navigation.navigate('Map', {event: item});
-              }}/>
-          </View>
+        <FlatList data={data} 
+          renderItem={({item}) => 
+            <ListItem 
+              title={item.location} 
+              onPress={() => { props.navigation.navigate('Map', {event: item});}}
+              onLongPress={() => deleteItem(item.location, item.id)}
+              bottomDivider
+              topDivider/>
           }/>
       </View>
     </View>
@@ -54,7 +59,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     alignItems: 'center',
+    justifyContent: 'center'
+  },TitleContainer: {
+    height: 80,
+    marginTop: StatusBar.currentHeight + 20,
+    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 100
-  },
+    marginLeft: 30,
+    marginRight: 30,
+    marginBottom: 30
+  }, list: {
+    flex: 1,
+    width: '90%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between'
+  }, HeaderText: {
+    textAlign: 'center', 
+    fontSize: 30, 
+    fontWeight: 'bold', 
+    margin: 5}
 });

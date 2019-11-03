@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useRef} from 'react';
-import { StyleSheet, Button, Text, Alert, TextInput, View, StatusBar, Image, KeyboardAvoidingView} from 'react-native';
+import { StyleSheet, Text, Alert, ToastAndroid, View, StatusBar, Image, KeyboardAvoidingView} from 'react-native';
 
 import * as Location from 'expo-location';
 import * as Permissions from 'expo-permissions';
@@ -7,6 +7,8 @@ import MapView, {Marker, AnimatedRegion} from 'react-native-maps';
 import * as SQLite from 'expo-sqlite';
 import Database from './DatabaseManager.js';
 import { NavigationEvents } from 'react-navigation';
+import { Card, SearchBar, Button, Icon } from 'react-native-elements';
+import{ Ionicons } from'@expo/vector-icons';
 
 export default function MapScreen(props) {
 
@@ -48,6 +50,7 @@ export default function MapScreen(props) {
       tx.executeSql('insert or ignore into favorites (location, latitude, longitude) values (?, ?, ?);',
         [params.locationName, params.latitude, params.longitude]);
     }, null, null);
+    ToastAndroid.show(params.locationName + " added to favorites", ToastAndroid.LONG);
   }
 
   const getUsersLocation = async () => {
@@ -129,11 +132,9 @@ export default function MapScreen(props) {
   };
 
   const updateLocation = (event) => {
-    console.log("called1");
     if(event == '') {
       return;
     }
-    console.log("called2");
     setLatitude(event.latitude);
     setLongitude(event.longitude);
     
@@ -158,29 +159,33 @@ export default function MapScreen(props) {
         <Text style={{textAlign: 'center'}}>Start by searching for a city or tapping a location on a map</Text>
       </View>
       <View style={styles.SearchContainer}>
-        <TextInput 
-              style={styles.Input} 
+        <SearchBar
+              platform='android'
+              returnKeyType='search'
+              searchIcon={null}
+              containerStyle={styles.SearchBar}
               placeholder='Search city'
               value={searchText}
-              onChangeText={(text) => setSearchText(text)}>
-        </TextInput>
-        <Button title="Find" onPress={getLocationDataByName}></Button>
+              onSubmitEditing={getLocationDataByName}
+              onChangeText={(text) => setSearchText(text)}/>
+        <Icon name="md-search" type='ionicon' raised
+          reverseColor="#ffffff" color="#000000" onPress={getLocationDataByName}/>
       </View>
 
       { locationName !== '' ? (
-        <View style={styles.WeatherContainer}>
-          <Text style={styles.TextHeader}>{locationName}</Text>
-          <View style={{flexDirection: 'column'}}>
+        <Card title={locationName}>
+          <View style={styles.WeatherInfo}>
             <Text style={styles.TextStyle}>{tempature + "°C"}</Text>
             <Text style={styles.TextStyle}>{weather}</Text>
-            <Button title="Add" onPress={() => saveItem({locationName: locationName, latitude: lat, longitude: long})}/>
+            <Button icon={<Ionicons name='md-heart' size={25} color={'#ffffff'}/>} 
+              buttonStyle={{backgroundColor: '#FF0000'}} onPress={() => saveItem({locationName: locationName, latitude: lat, longitude: long})}></Button>
           </View>
-        </View>
+        </Card>
         ) : (
           <View></View>
         )}
 
-      <MapView style={{flex: 8}} onPress={
+      <MapView style={{flex: 1, marginTop: 30}} onPress={
           (event) => updateLocation(event.nativeEvent.coordinate)} ref={ref => (this.mapView = ref)}>
 
         <Marker coordinate={{latitude: lat, longitude: long}}>
@@ -201,20 +206,18 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     paddingBottom: 0
   }, TitleContainer: {
-    flex: 1,
+    height: 80,
     marginTop: StatusBar.currentHeight + 20,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 30,
-    marginRight: 30
-  }, WeatherContainer: {
-    flex: 1.5,
+    marginRight: 30,
+  }, WeatherInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    margin: 20,
-  }, SearchContainer: {
-    flex: 1,
+  } , SearchContainer: {
+    height: 50,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -229,11 +232,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center'
-  }, Input: {
-    width: '80%',
-    height: '50%',
-    margin: 5,
-    borderColor: '#555555', 
-    borderWidth: 1
+  }, SearchBar: {
+    width: '80%'
   }
 });
