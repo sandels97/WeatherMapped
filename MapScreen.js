@@ -4,9 +4,12 @@ import { StyleSheet, Button, Text, Alert, TextInput, View, StatusBar, Image, Key
 import * as Location from 'expo-location';
 import * as Permissions from 'expo-permissions';
 import MapView, {Marker, AnimatedRegion} from 'react-native-maps';
+import * as SQLite from 'expo-sqlite';
+import Database from './DatabaseManager.js';
+import { NavigationEvents } from 'react-navigation';
 
-export default function MapScreen() {
-  
+export default function MapScreen(props) {
+
   const weatherApiKey = '';
   const mapQuestApiKey = '';
 
@@ -19,9 +22,33 @@ export default function MapScreen() {
   const[weatherImage, setWeatherImage] = useState('');
   const[locationName, setLocationName] = useState('');
 
+  const db  = Database.getConnection();
+
   useEffect(() => {
+    /*db.transaction(tx  => {
+      tx.executeSql(
+      'drop table favorites;'
+      )});*/
+    //Initialize database table
+    db.transaction(tx  => {
+      tx.executeSql(
+      'create table if not exists favorites (id  integer primary key not null, location text unique, latitude double, longitude double);'
+      )});
+
     getUsersLocation();
   },[]);
+
+  //Save item to database
+  const saveItem = (params) => {
+    if(params.locationName == '') {
+      Alert.alert("Can't add favorite!");
+      return;
+    }
+    db.transaction( tx => {
+      tx.executeSql('insert or ignore into favorites (location, latitude, longitude) values (?, ?, ?);',
+        [params.locationName, params.latitude, params.longitude]);
+    }, null, null);
+  }
 
   const getUsersLocation = async () => {
     const {status} = await Permissions.askAsync(Permissions.LOCATION);
@@ -102,6 +129,11 @@ export default function MapScreen() {
   };
 
   const updateLocation = (event) => {
+    console.log("called1");
+    if(event == '') {
+      return;
+    }
+    console.log("called2");
     setLatitude(event.latitude);
     setLongitude(event.longitude);
     
@@ -120,7 +152,7 @@ export default function MapScreen() {
   }
   return (
     <View style={styles.container}>
-
+      <NavigationEvents onDidFocus={() => updateLocation(props.navigation.getParam('event', ''))}/>
       <View style={styles.TitleContainer}>
         <Text style={{textAlign: 'center', fontSize: 30, fontWeight: 'bold', margin: 5}}>Weather Mapped</Text>
         <Text style={{textAlign: 'center'}}>Start by searching for a city or tapping a location on a map</Text>
@@ -141,6 +173,7 @@ export default function MapScreen() {
           <View style={{flexDirection: 'column'}}>
             <Text style={styles.TextStyle}>{tempature + "°C"}</Text>
             <Text style={styles.TextStyle}>{weather}</Text>
+            <Button title="Add" onPress={() => saveItem({locationName: locationName, latitude: lat, longitude: long})}/>
           </View>
         </View>
         ) : (
@@ -175,7 +208,7 @@ const styles = StyleSheet.create({
     marginLeft: 30,
     marginRight: 30
   }, WeatherContainer: {
-    flex: 1,
+    flex: 1.5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',

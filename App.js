@@ -9,7 +9,7 @@ import MapScreen from './MapScreen';
 import FavoritesScreen from './FavoritesScreen';
 
 export default function App() {
-  
+  console.disableYellowBox = true;
   const Navigator = createBottomTabNavigator({
     Map: {screen: MapScreen},
     Favorites: {screen: FavoritesScreen}
