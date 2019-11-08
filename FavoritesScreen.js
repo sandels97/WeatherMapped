@@ -1,6 +1,5 @@
 import React, {useState, useEffect} from 'react';
 import { StyleSheet, Text, View, FlatList, Button, ToastAndroid, StatusBar } from 'react-native';
-import * as SQLite from 'expo-sqlite';
 import Database from './DatabaseManager.js';
 import { NavigationEvents } from 'react-navigation';
 import { ListItem } from 'react-native-elements';
@@ -35,10 +34,10 @@ export default function FavoritesScreen(props) {
     <View style={styles.container}>
       <View style={styles.TitleContainer}>
         <Text style={styles.HeaderText}>Favorites</Text>
-        <Text style={{textAlign: 'center'}}>Tap location to navigate to it in the map or press and hold to unfavorite it</Text>
+        <Text style={{textAlign: 'center'}}>Tap location to navigate to it in the map or press and hold it to unfavorite it</Text>
       </View>
       
-      <NavigationEvents onDidFocus={() => updateList()}/>
+      <NavigationEvents onWillFocus={() => updateList()}/>
       <View style={styles.list}>
         <FlatList data={data} 
           renderItem={({item}) => 

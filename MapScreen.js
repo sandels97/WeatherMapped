@@ -1,10 +1,9 @@
 import React, {useState, useEffect, useRef} from 'react';
-import { StyleSheet, Text, Alert, ToastAndroid, View, StatusBar, Image, KeyboardAvoidingView} from 'react-native';
+import { StyleSheet, Text, Alert, ToastAndroid, View, StatusBar, Image, ImageBackground, KeyboardAvoidingView} from 'react-native';
 
 import * as Location from 'expo-location';
 import * as Permissions from 'expo-permissions';
 import MapView, {Marker, AnimatedRegion} from 'react-native-maps';
-import * as SQLite from 'expo-sqlite';
 import Database from './DatabaseManager.js';
 import { NavigationEvents } from 'react-navigation';
 import { Card, SearchBar, Button, Icon } from 'react-native-elements';
@@ -12,6 +11,7 @@ import{ Ionicons } from'@expo/vector-icons';
 
 export default function MapScreen(props) {
 
+  //Remember to add api keys for the WeatherApi & MapQuestApi
   const weatherApiKey = '';
   const mapQuestApiKey = '';
 
@@ -24,13 +24,21 @@ export default function MapScreen(props) {
   const[weatherImage, setWeatherImage] = useState('');
   const[locationName, setLocationName] = useState('');
 
+  //Show all favorite locations as markers on the map
+  const[markersArray, setMarkersArray] = useState([]);
+
   const db  = Database.getConnection();
 
+  const markerSize = 40;
+
   useEffect(() => {
+
+    //For testing
     /*db.transaction(tx  => {
       tx.executeSql(
       'drop table favorites;'
       )});*/
+
     //Initialize database table
     db.transaction(tx  => {
       tx.executeSql(
@@ -38,6 +46,7 @@ export default function MapScreen(props) {
       )});
 
     getUsersLocation();
+    updateMarkers();
   },[]);
 
   //Save item to database
@@ -51,6 +60,7 @@ export default function MapScreen(props) {
         [params.locationName, params.latitude, params.longitude]);
     }, null, null);
     ToastAndroid.show(params.locationName + " added to favorites", ToastAndroid.LONG);
+    updateMarkers();
   }
 
   const getUsersLocation = async () => {
@@ -81,8 +91,8 @@ export default function MapScreen(props) {
     }
   };
 
-  const getLocationDataByCoordinates = async (latidute, longitude) => {
-    const url = 'http://www.mapquestapi.com/geocoding/v1/reverse?key=' + mapQuestApiKey + '&location=' + latidute + ',' + longitude;
+  const getLocationDataByCoordinates = async (latitude, longitude) => {
+    const url = 'http://www.mapquestapi.com/geocoding/v1/reverse?key=' + mapQuestApiKey + '&location=' + latitude + ',' + longitude;
     const response = await fetch(url);
 
     const data = await response.json();
@@ -95,7 +105,9 @@ export default function MapScreen(props) {
     searchWeatherByLocation(data.results[0].locations[0].adminArea5);
   }
   const getLocationDataByName = async () => {
-    const url = 'http://www.mapquestapi.com/geocoding/v1/address?key=' + mapQuestApiKey + '&location=' + searchText;
+    const url = 'http://www.mapquestapi.com/geocoding/v1/address?key=' + 
+        mapQuestApiKey + '&location=' + searchText;
+
     const response = await fetch(url);
 
     const data = await response.json();
@@ -120,7 +132,7 @@ export default function MapScreen(props) {
       setTempature(data.main.temp);
       setWeather(data.weather[0].main);
       setLocationName(data.name);
-      var iconUrl = "http://openweathermap.org/img/w/" + data.weather[0].icon + ".png";
+      var iconUrl = "http://openweathermap.org/img/wn/" + data.weather[0].icon + ".png";
       setWeatherImage(iconUrl);
     } else {
       //Error fetching weather data
@@ -128,6 +140,7 @@ export default function MapScreen(props) {
       setWeather('');
       setLocationName('');
       setWeatherImage('');
+      Alert.alert("Error: could not fetch weather data!");
     }
   };
 
@@ -151,9 +164,22 @@ export default function MapScreen(props) {
     };
     this.mapView.animateToRegion(region, 1000);
   }
+
+  const updateMarkers = () => {
+    db.transaction( tx => {
+      tx.executeSql('select * from favorites;', [], (_, {rows}) => {
+          setMarkersArray(rows._array);
+        }
+      );
+    });
+  }
+
   return (
     <View style={styles.container}>
-      <NavigationEvents onDidFocus={() => updateLocation(props.navigation.getParam('event', ''))}/>
+      <NavigationEvents onWillFocus={() => {
+        updateMarkers();
+        updateLocation(props.navigation.getParam('event', ''));
+    }}/>
       <View style={styles.TitleContainer}>
         <Text style={{textAlign: 'center', fontSize: 30, fontWeight: 'bold', margin: 5}}>Weather Mapped</Text>
         <Text style={{textAlign: 'center'}}>Start by searching for a city or tapping a location on a map</Text>
@@ -187,10 +213,28 @@ export default function MapScreen(props) {
 
       <MapView style={{flex: 1, marginTop: 30}} onPress={
           (event) => updateLocation(event.nativeEvent.coordinate)} ref={ref => (this.mapView = ref)}>
+          
+          {markersArray[0] != null && markersArray.map((marker, index) => (
+            <MapView.Marker
+                onPress={() => updateLocation({latitude: marker.latitude, longitude: marker.longitude})}
+                key = {index}
+                coordinate = {{
+                    latitude: marker.latitude,
+                    longitude: marker.longitude
+                }}
+                title = { marker.location }
+            />
+          ))}
 
-        <Marker coordinate={{latitude: lat, longitude: long}}>
+        <Marker coordinate={{latitude: lat, longitude: long}} title={locationName}>
             <View style={{alignItems: "center", justifyContent: "center"}}>
-              <Image source={{uri: weatherImage}} style={{height: 35, width:35 }} />
+              { weatherImage !== '' ? (
+              <View style={styles.MarkerBackground}>
+                <Image source={{uri: weatherImage}} style={{height: markerSize, width: markerSize}} />
+              </View>
+              ) : (
+                <View style={{opacity: 0}}/>
+              )}
             </View>
           </Marker>
       </MapView>
@@ -234,5 +278,15 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   }, SearchBar: {
     width: '80%'
+  }, MarkerBackground: {
+    width: 40,
+    height: 40,
+    borderRadius: 40 / 2,
+    //Light blue background works best with the weather icons
+    backgroundColor: 'rgba(150, 150, 255, 0.8)', 
+    borderColor: 'rgba(0, 0, 0, 0.8)',
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center'
   }
 });
