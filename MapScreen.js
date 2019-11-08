@@ -1,5 +1,5 @@
-import React, {useState, useEffect, useRef} from 'react';
-import { StyleSheet, Text, Alert, ToastAndroid, View, StatusBar, Image, ImageBackground, KeyboardAvoidingView} from 'react-native';
+import React, {useState, useEffect} from 'react';
+import { StyleSheet, Text, Alert, ToastAndroid, View, StatusBar, Image} from 'react-native';
 
 import * as Location from 'expo-location';
 import * as Permissions from 'expo-permissions';
@@ -7,7 +7,7 @@ import MapView, {Marker, AnimatedRegion} from 'react-native-maps';
 import Database from './DatabaseManager.js';
 import { NavigationEvents } from 'react-navigation';
 import { Card, SearchBar, Button, Icon } from 'react-native-elements';
-import{ Ionicons } from'@expo/vector-icons';
+import{ Ionicons } from '@expo/vector-icons';
 
 export default function MapScreen(props) {
 
@@ -24,12 +24,10 @@ export default function MapScreen(props) {
   const[weatherImage, setWeatherImage] = useState('');
   const[locationName, setLocationName] = useState('');
 
-  //Show all favorite locations as markers on the map
-  const[markersArray, setMarkersArray] = useState([]);
+  //Show all favorite locations as Favorites on the map
+  const[favoritesArray, setFavoritesArray] = useState([]);
 
   const db  = Database.getConnection();
-
-  const markerSize = 40;
 
   useEffect(() => {
 
@@ -46,21 +44,39 @@ export default function MapScreen(props) {
       )});
 
     getUsersLocation();
-    updateMarkers();
+    updateFavorites();
   },[]);
 
   //Save item to database
   const saveItem = (params) => {
+
     if(params.locationName == '') {
       Alert.alert("Can't add favorite!");
       return;
     }
+
+    if(isLocationAlreadyFavorited(params.locationName)) {
+      ToastAndroid.show(params.locationName + " has already been added to favorites", ToastAndroid.LONG);
+      return;
+    }
+
     db.transaction( tx => {
       tx.executeSql('insert or ignore into favorites (location, latitude, longitude) values (?, ?, ?);',
         [params.locationName, params.latitude, params.longitude]);
     }, null, null);
     ToastAndroid.show(params.locationName + " added to favorites", ToastAndroid.LONG);
-    updateMarkers();
+    updateFavorites();
+  }
+
+  const isLocationAlreadyFavorited = (location) => {
+    console.log(location);
+    for(var i=0; i<favoritesArray.length;i++){
+      if(location === favoritesArray[i].location) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   const getUsersLocation = async () => {
@@ -140,7 +156,7 @@ export default function MapScreen(props) {
       setWeather('');
       setLocationName('');
       setWeatherImage('');
-      Alert.alert("Error: could not fetch weather data!");
+      ToastAndroid.show("Error: could not fetch weather data", ToastAndroid.LONG);
     }
   };
 
@@ -165,10 +181,10 @@ export default function MapScreen(props) {
     this.mapView.animateToRegion(region, 1000);
   }
 
-  const updateMarkers = () => {
+  const updateFavorites = () => {
     db.transaction( tx => {
       tx.executeSql('select * from favorites;', [], (_, {rows}) => {
-          setMarkersArray(rows._array);
+          setFavoritesArray(rows._array);
         }
       );
     });
@@ -177,7 +193,7 @@ export default function MapScreen(props) {
   return (
     <View style={styles.container}>
       <NavigationEvents onWillFocus={() => {
-        updateMarkers();
+        updateFavorites();
         updateLocation(props.navigation.getParam('event', ''));
     }}/>
       <View style={styles.TitleContainer}>
@@ -203,8 +219,8 @@ export default function MapScreen(props) {
           <View style={styles.WeatherInfo}>
             <Text style={styles.TextStyle}>{tempature + "°C"}</Text>
             <Text style={styles.TextStyle}>{weather}</Text>
-            <Button icon={<Ionicons name='md-heart' size={25} color={'#ffffff'}/>} 
-              buttonStyle={{backgroundColor: '#FF0000'}} onPress={() => saveItem({locationName: locationName, latitude: lat, longitude: long})}></Button>
+            <Button buttonStyle={isLocationAlreadyFavorited(locationName) ? styles.ButtonActive : styles.ButtonInactive} icon={<Ionicons name='md-heart' size={25} color={'#ffffff'}/>} 
+              onPress={() => saveItem({locationName: locationName, latitude: lat, longitude: long})}></Button>
           </View>
         </Card>
         ) : (
@@ -214,8 +230,12 @@ export default function MapScreen(props) {
       <MapView style={{flex: 1, marginTop: 30}} onPress={
           (event) => updateLocation(event.nativeEvent.coordinate)} ref={ref => (this.mapView = ref)}>
           
-          {markersArray[0] != null && markersArray.map((marker, index) => (
+          {favoritesArray[0] != null && favoritesArray.map((marker, index) => (
             <MapView.Marker
+                opacity={ 
+                  //Hide favorite marker if it's overlapping with the default marker
+                  (weatherImage !== '' && Math.abs(marker.latitude - lat) < 0.1 && Math.abs(marker.longitude - long) < 0.1) ? 0 : 1
+                }
                 onPress={() => updateLocation({latitude: marker.latitude, longitude: marker.longitude})}
                 key = {index}
                 coordinate = {{
@@ -230,7 +250,7 @@ export default function MapScreen(props) {
             <View style={{alignItems: "center", justifyContent: "center"}}>
               { weatherImage !== '' ? (
               <View style={styles.MarkerBackground}>
-                <Image source={{uri: weatherImage}} style={{height: markerSize, width: markerSize}} />
+                <Image source={{uri: weatherImage}} style={{height: 40, width: 40}} />
               </View>
               ) : (
                 <View style={{opacity: 0}}/>
@@ -288,5 +308,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center'
+  }, ButtonActive: {
+    backgroundColor: 'rgb(255, 0, 0)', 
+  }, ButtonInactive: {
+    backgroundColor: 'rgb(150, 150, 150)', 
   }
 });
