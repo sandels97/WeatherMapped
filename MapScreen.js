@@ -3,7 +3,7 @@ import { StyleSheet, Text, Alert, ToastAndroid, View, StatusBar, Image} from 're
 
 import * as Location from 'expo-location';
 import * as Permissions from 'expo-permissions';
-import MapView, {Marker, AnimatedRegion} from 'react-native-maps';
+import MapView, {Marker} from 'react-native-maps';
 import Database from './DatabaseManager.js';
 import { NavigationEvents } from 'react-navigation';
 import { Card, SearchBar, Button, Icon } from 'react-native-elements';
@@ -101,6 +101,7 @@ export default function MapScreen(props) {
 
   const searchWeatherByLocation = async (name) => {
     try {
+      
       const response = await fetch('http://api.openweathermap.org/data/2.5/weather?q=' + name + '&units=metric&APPID=' + weatherApiKey);
 
       const data = await response.json();

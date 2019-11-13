@@ -1,5 +1,5 @@
 import React, {useState, useEffect} from 'react';
-import { StyleSheet, Text, View, FlatList, Button, ToastAndroid, StatusBar } from 'react-native';
+import { StyleSheet, Text, Alert, View, FlatList, Button, ToastAndroid, StatusBar } from 'react-native';
 import Database from './DatabaseManager.js';
 import { NavigationEvents } from 'react-navigation';
 import { ListItem } from 'react-native-elements';
@@ -29,7 +29,27 @@ export default function FavoritesScreen(props) {
       );
     });
   }
-
+  const showConfirmationDialog = () => {
+    Alert.alert(
+      'Unfavorite all', 'Are you sure?',
+      [
+        {
+          text: 'Cancel',
+          onPress: () => console.log('Cancel Pressed'),
+          style: 'cancel',
+        },
+        {text: 'Unfavorite', 
+        onPress: () => clearFavorites()},
+      ],
+      {cancelable: false},
+    );
+  }
+  const clearFavorites = () => {
+    db.transaction(tx => {
+      tx.executeSql('delete from favorites;',[]);
+    }, null, updateList);
+    ToastAndroid.show("Favorites cleared", ToastAndroid.LONG);
+  }
   return (
     <View style={styles.container}>
       <View style={styles.TitleContainer}>
@@ -49,6 +69,14 @@ export default function FavoritesScreen(props) {
               topDivider/>
           }/>
       </View>
+      {data.length > 0 ? (
+        <View style={styles.SettingsContainer}>      
+          <Button title="Unfavorite all" onPress={() => showConfirmationDialog()}/>
+        </View>
+      ) : (
+        <View/>
+      )}
+
     </View>
   );
 }
@@ -68,7 +96,7 @@ const styles = StyleSheet.create({
     marginRight: 30,
     marginBottom: 30
   }, list: {
-    flex: 1,
+    flex: 3,
     width: '90%',
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -77,5 +105,11 @@ const styles = StyleSheet.create({
     textAlign: 'center', 
     fontSize: 30, 
     fontWeight: 'bold', 
-    margin: 5}
+    margin: 5
+  }, SettingsContainer: {
+      flex: 1,
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center'
+  }
 });
