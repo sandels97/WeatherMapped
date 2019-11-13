@@ -47,29 +47,33 @@ export default function MapScreen(props) {
     updateFavorites();
   },[]);
 
-  //Save item to database
-  const saveItem = (params) => {
+  //Favorite or unfavorite location
+  const favoriteLocation = (params) => {
 
     if(params.locationName == '') {
       Alert.alert("Can't add favorite!");
       return;
     }
 
+    //Remove location from the database
     if(isLocationAlreadyFavorited(params.locationName)) {
-      ToastAndroid.show(params.locationName + " has already been added to favorites", ToastAndroid.LONG);
+      db.transaction( tx => {
+        tx.executeSql('delete from favorites where location = ?;',[params.locationName]);
+      }, null, updateFavorites);
+      ToastAndroid.show(params.locationName + " removed from favorites", ToastAndroid.LONG);
       return;
     }
 
+    //Save location to the database
     db.transaction( tx => {
       tx.executeSql('insert or ignore into favorites (location, latitude, longitude) values (?, ?, ?);',
         [params.locationName, params.latitude, params.longitude]);
-    }, null, null);
+    }, null, updateFavorites);
     ToastAndroid.show(params.locationName + " added to favorites", ToastAndroid.LONG);
-    updateFavorites();
   }
 
   const isLocationAlreadyFavorited = (location) => {
-    console.log(location);
+
     for(var i=0; i<favoritesArray.length;i++){
       if(location === favoritesArray[i].location) {
         return true;
@@ -195,6 +199,7 @@ export default function MapScreen(props) {
       <NavigationEvents onWillFocus={() => {
         updateFavorites();
         updateLocation(props.navigation.getParam('event', ''));
+        props.navigation.setParams({event: ''});
     }}/>
       <View style={styles.TitleContainer}>
         <Text style={{textAlign: 'center', fontSize: 30, fontWeight: 'bold', margin: 5}}>Weather Mapped</Text>
@@ -220,7 +225,7 @@ export default function MapScreen(props) {
             <Text style={styles.TextStyle}>{tempature + "°C"}</Text>
             <Text style={styles.TextStyle}>{weather}</Text>
             <Button buttonStyle={isLocationAlreadyFavorited(locationName) ? styles.ButtonActive : styles.ButtonInactive} icon={<Ionicons name='md-heart' size={25} color={'#ffffff'}/>} 
-              onPress={() => saveItem({locationName: locationName, latitude: lat, longitude: long})}></Button>
+              onPress={() => favoriteLocation({locationName: locationName, latitude: lat, longitude: long})}></Button>
           </View>
         </Card>
         ) : (
@@ -234,7 +239,7 @@ export default function MapScreen(props) {
             <MapView.Marker
                 opacity={ 
                   //Hide favorite marker if it's overlapping with the default marker
-                  (weatherImage !== '' && Math.abs(marker.latitude - lat) < 0.1 && Math.abs(marker.longitude - long) < 0.1) ? 0 : 1
+                  (weatherImage !== '' && marker.location === locationName) ? 0 : 1
                 }
                 onPress={() => updateLocation({latitude: marker.latitude, longitude: marker.longitude})}
                 key = {index}
